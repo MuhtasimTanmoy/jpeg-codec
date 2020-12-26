@@ -92,8 +92,13 @@ const bytebits RST5 = (bytebits)0xd5;
 const bytebits RST6 = (bytebits)0xd6;
 const bytebits RST7 = (bytebits)0xd7;
 
+struct QuantizationTable {
+    uint table[64] = {0};
+    bool set = false;
+};
 
 struct Header {
+    QuantizationTable quantizationTable[4];
     bool valid = true;
 };
 

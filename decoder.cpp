@@ -2,6 +2,55 @@
 #include <bits/stdc++.h>
 using namespace std;
 
+
+void readAPPN(ifstream& fs, Header* const header) {
+    cout<<"Reading APPN"<<endl;
+    uint length = (fs.get() << 8) + fs.get();
+
+    for (uint i = 0; i < length-2; i++) {
+        fs.get();
+    }
+}
+
+
+void readDQT(ifstream& fs, Header* const header) {
+    cout<<"Quantization table"<<endl;
+    int length = (fs.get() << 8) + fs.get();
+    length-=2;
+
+    while(length > 0) {
+        uint bit_type = fs.get();
+        length--;
+
+        uint tableID = bit_type & 0x0F;
+        if(tableID > 3) {
+            cout<<"Invalid table ID "<<tableID<<endl;
+            header->valid = false;
+            return;
+        }
+        header->quantizationTable[tableID].set = true;
+
+        uint is64 = bit_type >> 4;
+        if (is64) {
+            for (uint i = 0; i < 64; i++) {
+                header->quantizationTable[i] = (fs.get() << 8) + fs.get();
+            }
+            length-=128;
+        } else {
+             for (uint i = 0; i < 64; i++) {
+                header->quantizationTable[i] =  fs.get();
+            }
+            length-=64;
+        }
+    }
+
+    if(length != 0) {
+        cout<<"Marker invalid"<<endl;
+    }
+
+}
+
+
 Header* readJPG(const string& filename ) {
     // Read file
     ifstream inFile = ifstream(filename, ios::in | ios::binary);
@@ -17,13 +66,40 @@ Header* readJPG(const string& filename ) {
         return nullptr;
     }
 
-    bytebits last = (bytebits)inFile.get();
-    bytebits current = (bytebits)inFile.get();
+    bytebits left = (bytebits)inFile.get();
+    bytebits right = (bytebits)inFile.get();
 
-    if (last != 0xFF && current != SOI) {
+    if (left != 0xFF && right != SOI) {
         header->valid = false;
         inFile.close();
         return header;
+    }
+
+    left = (bytebits)inFile.get();
+    right = (bytebits)inFile.get();
+    while(header->valid){
+        if(!inFile){
+            cout<<"Error in file"<<endl;
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+
+        if(left != 0xFF) {
+            cout<<"Not a marker"<<endl;
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        else if (right == DQT) {
+            readDQT(inFile, header);
+        }
+        else if (right >= APP0 && right <= APP15) {
+            readAPPN(inFile, header);
+        }
+
+        left = (bytebits)inFile.get();
+        right = (bytebits)inFile.get();
     }
 
     return header;
