@@ -34,7 +34,6 @@ const bytebits SOF13 = (bytebits)0xcd; // sequential dct
 const bytebits SOF14 = (bytebits)0xce; // progressive dct
 const bytebits SOF15 = (bytebits)0xcf; // lossless
 
-
 /// Huffman Table
 const bytebits DHT = (bytebits)0xc4;
 
@@ -92,14 +91,27 @@ const bytebits RST5 = (bytebits)0xd5;
 const bytebits RST6 = (bytebits)0xd6;
 const bytebits RST7 = (bytebits)0xd7;
 
-struct QuantizationTable {
+struct QuantizationTable
+{
     uint table[64] = {0};
     bool set = false;
 };
 
-struct Header {
+struct Header
+{
     QuantizationTable quantizationTable[4];
     bool valid = true;
+};
+
+const bytebits zigzagMap[] = {
+    0, 1, 5, 6, 14, 15, 27, 28,
+    2, 4, 7, 13, 16, 26, 29, 42,
+    3, 8, 12, 17, 25, 30, 41, 43,
+    9, 11, 18, 24, 31, 40, 44, 53,
+    10, 19, 23, 32, 39, 45, 52, 54,
+    20, 22, 33, 38, 46, 51, 55, 60,
+    21, 34, 37, 47, 50, 56, 59, 61,
+    35, 36, 48, 49, 57, 58, 62, 63
 };
 
 #endif
