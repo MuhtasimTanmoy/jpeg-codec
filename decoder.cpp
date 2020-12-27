@@ -31,14 +31,14 @@ void readDQT(ifstream& fs, Header* const header) {
         header->quantizationTable[tableID].set = true;
 
         uint is64 = bit_type >> 4;
-        if (is64) {
+        if (is64>0) {
             for (uint i = 0; i < 64; i++) {
-                header->quantizationTable[i] = (fs.get() << 8) + fs.get();
+                header->quantizationTable[tableID].table[i] = (fs.get() << 8) + fs.get();
             }
             length-=128;
         } else {
              for (uint i = 0; i < 64; i++) {
-                header->quantizationTable[i] =  fs.get();
+                header->quantizationTable[tableID].table[i] =  fs.get();
             }
             length-=64;
         }
@@ -46,8 +46,27 @@ void readDQT(ifstream& fs, Header* const header) {
 
     if(length != 0) {
         cout<<"Marker invalid"<<endl;
+        header->valid = false;
     }
 
+}
+
+void printHeader(const Header* const header) {
+    if (header == nullptr) return;
+    cout<<"DQT"<<endl;
+
+    for (int i = 0; i < 4; i++) {
+        if (header->quantizationTable[i].set) {
+            cout<<"Table ID "<< i <<endl;
+            cout<<"Table Data"<<endl;
+
+            for (int j = 0; j < 64; j++) {
+                if (j % 8 == 0) cout<<endl;
+                cout<< header->quantizationTable[i].table[j] <<' ';
+            }
+            cout<<endl;
+        }
+    }
 }
 
 
@@ -118,6 +137,8 @@ int main(int argc, char** argv) {
         if (header == nullptr) {
             continue;
         }
+
+        printHeader(header);
 
         if (header->valid == false) {
             cout<<"Header not valid"<<endl;
