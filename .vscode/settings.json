@@ -5,6 +5,8 @@
         "istream": "cpp",
         "fstream": "cpp",
         "ostream": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "cstddef": "cpp",
+        "iostream": "cpp"
     }
 }

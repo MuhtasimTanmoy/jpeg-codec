@@ -44,6 +44,85 @@ void readDQT(ifstream& fs, Header* const header) {
     }
 }
 
+void readFrame(ifstream& f, Header* const header) {
+    cout<<"Reading SOF markers\n";
+    if(header->numOfComponents != 0) {
+        cout<<"Error multiple SOF  header detected";
+        header->valid = false;
+        return;
+    }
+    int length = (f.get() << 8) + f.get();
+    int precision = f.get();
+    if(precision != 8) {
+        cout<<"Error in precision"<<endl;
+        header->valid = false;
+        return;
+    }
+
+    header->height = (f.get() << 8) + f.get();
+    header->width = (f.get() << 8) + f.get();
+    if(header->height == 0 || header->width == 0) {
+        cout<<"Invalid JPEG\n";
+        header->valid = false;
+        return;
+    }
+
+    header->numOfComponents = f.get();
+    if(header->numOfComponents == 0) {
+        cout<<"Invalid number of components\n";
+        header->valid = false;
+        return;
+    }
+    else if(header->numOfComponents == 4) {
+        cout<<"CMYK color component\n";
+        header->valid = false;
+        return;
+    }
+
+    for (uint i = 0; i < header->numOfComponents; i++) {
+        bytebits componentID = f.get();
+        if (componentID == 4 || componentID == 5) {
+            cout<<"YIQ color mode not supported\n";
+            header->valid = false;
+            return;
+        }
+        if (componentID == 0 || componentID > 3) {
+            cout<<"Invalid color componentID\n";
+            header->valid = false;
+            return;
+        }
+        ColorComponent* colorComponent = &header->colorComponents[componentID-1];
+        if (colorComponent->used) {
+            cout<<"Duplicate color component\n";
+            header->valid = false;
+            return; 
+        }
+        colorComponent->used = true;
+        bytebits samplingFactor = f.get();
+        colorComponent->horizaontalSamplingFactor = samplingFactor >> 4;
+        colorComponent->verticalSamplingFactor = samplingFactor & 0x0F;
+
+        if (colorComponent->horizaontalSamplingFactor !=1 || colorComponent->verticalSamplingFactor != 1) {
+            cout<<"Scaling factor error\n";
+            header->valid = false;
+            return;
+        }
+
+        colorComponent->quantizationTableID = f.get();
+        if(colorComponent->quantizationTableID > 3) {
+            cout<<"Invalid table ID";
+            header->valid = false;
+            return;
+        }
+
+        if (length -2 - 1 - 4 - 1 - header->numOfComponents * 3 != 0) {
+            cout<<"Invalid length\n";
+            header->valid = false;
+            return;
+        }
+    }
+}
+
 void printHeader(const Header* const header) {
     if (header == nullptr) return;
     cout<<"DQT"<<endl;
@@ -58,6 +137,22 @@ void printHeader(const Header* const header) {
             }
             cout<<endl;
         }
+    }
+
+    cout<<"Frame Type "<<::hex<<(int)header->frameType<<::dec<<endl;
+    cout<<"Height "<<header->height<<endl;
+    cout<<"Width "<<header->width<<endl;
+    cout<<"Number of Components "<<header->numOfComponents<<endl;
+
+    cout<<"Components "<<endl;
+
+    for (int i = 0; i < header->numOfComponents; i++) {
+        cout<<endl;
+        cout<<"Component ID "<<i<<" "<<"\n";
+        cout<<"Horizaontal sampling factor: "<< (int)header->colorComponents[i].horizaontalSamplingFactor <<"\n";
+        cout<<"Vertical sampling factor: "<< (int)header->colorComponents[i].verticalSamplingFactor <<"\n";
+        cout<<"Quantization Table ID: "<< (int)header->colorComponents[i].quantizationTableID <<"\n";
+        cout<<endl;
     }
 }
 
@@ -98,8 +193,18 @@ Header* readJPG(const string& filename ) {
             inFile.close();
             return header;
         }
-        else if (right == DQT) {
+        if (right == DQT) {
             readDQT(inFile, header);
+        }
+        else if (right == SOF0) {
+            cout<<"Baseline DCT\n";
+            header->frameType = SOF0;
+            readFrame(inFile, header);
+        }
+        else if (right == SOF2) {
+            cout<<"Progressive DCT\n";
+            header->frameType = SOF2;
+            readFrame(inFile, header);
         }
         else if (right >= APP0 && right <= APP15) {
             readAPPN(inFile, header);
