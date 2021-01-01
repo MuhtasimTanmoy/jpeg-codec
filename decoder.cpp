@@ -1,4 +1,6 @@
+// Author: Muhtasim Ulfat Tanmoy
 #include "jpg.h"
+#include "markers.h"
 #include <bits/stdc++.h>
 using namespace std;
 
@@ -44,6 +46,16 @@ void readDQT(ifstream& fs, Header* const header) {
     }
 }
 
+void readRestartInterval(ifstream& f, Header* const header) {
+    cout<<"Reading Restart Interavl markers\n";
+    int length = (f.get()<<8) + f.get();
+    header->restartInterval = (f.get()<<8) + f.get();
+    if(length - 4 != 0) {
+        cout<<"Invalid marker"<<endl;
+        header->valid =false;
+    }
+}
+
 void readFrame(ifstream& f, Header* const header) {
     cout<<"Reading SOF markers\n";
     if(header->numOfComponents != 0) {
@@ -81,6 +93,14 @@ void readFrame(ifstream& f, Header* const header) {
 
     for (uint i = 0; i < header->numOfComponents; i++) {
         bytebits componentID = f.get();
+        if(componentID == 0) {
+            header->zeroBased = true;
+        }
+
+        if(header->zeroBased) {
+            componentID++;
+        }
+
         if (componentID == 4 || componentID == 5) {
             cout<<"YIQ color mode not supported\n";
             header->valid = false;
@@ -208,6 +228,9 @@ Header* readJPG(const string& filename ) {
         }
         else if (right >= APP0 && right <= APP15) {
             readAPPN(inFile, header);
+        }
+        else if(right == DRI) {
+            readRestartInterval(inFile, header);
         }
         left = (bytebits)inFile.get();
         right = (bytebits)inFile.get();
