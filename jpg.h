@@ -1,30 +1,29 @@
 #include "markers.h"
+#include <vector>
 #ifndef JPG_H
 #define JPG_H
 
-struct QuantizationTable
-{
+struct QuantizationTable {
     uint table[64] = {0};
     bool set = false;
 };
 
-struct ColorComponent
-{
+struct ColorComponent {
     bytebits horizaontalSamplingFactor = 1;
     bytebits verticalSamplingFactor = 1;
     bytebits quantizationTableID = 0;
+    bytebits huffmanACTableID = 0;
+    bytebits huffmanDCTableID = 0; 
     bool used = false;
 };
 
-struct HuffmanTable 
-{
+struct HuffmanTable {
     bytebits symbols[162] = { 0 };
     bytebits offset[17] = { 0 };
     bool set = false; 
 };
 
-struct Header
-{
+struct Header {
     QuantizationTable quantizationTable[4];
     HuffmanTable huffmanDCTables[4];
     HuffmanTable huffmanACTables[4];
@@ -34,11 +33,17 @@ struct Header
     uint numOfComponents = 0;
     bytebits frameType = 0;
     ColorComponent colorComponents[3];
-    bool valid = true;
 
+    bool valid = true;
     bool zeroBased = false;
 
     uint restartInterval = 0;
+    bytebits startOfSelection = 0;
+    bytebits endOfSelection = 0;
+    bytebits succesiveAppoximationHigh = 0;
+    bytebits succesiveAppoximationLow = 0;
+
+    vector<bytebits> huffmanData;
 };
 
 const bytebits zigzagMap[] = {
@@ -51,6 +56,4 @@ const bytebits zigzagMap[] = {
     21, 34, 37, 47, 50, 56, 59, 61,
     35, 36, 48, 49, 57, 58, 62, 63
 };
-
-
 #endif

@@ -46,6 +46,84 @@ void readDQT(ifstream& fs, Header* const header) {
     }
 }
 
+void readStartOfScan(ifstream& f, Header* const header) {
+    cout<<"Reading SOS markers\n";
+    if(header->numOfComponents == 0) {
+        cout<<"Error - SOS encountered before SOF\n";
+        header->valid = false;
+        return;
+    }
+    int length = (f.get() << 8) + f.get();
+    for (int i = 0; i < header->numOfComponents; i++){
+        header->colorComponents[i].used = false;
+    }
+
+    bytebits numberOfComponents = f.get();
+    for (int i = 0; i < numberOfComponents; i++){
+        bytebits componentID = f.get();
+        if (header->zeroBased) {
+            componentID += 1;
+        }
+        if (componentID > numberOfComponents) {
+            cout<<"Error : Invalid component ID: "<<componentID<<endl;
+            header->valid = false;
+            return;
+        }
+
+        ColorComponent* colorComponent = &header->colorComponents[componentID-1];
+        if (colorComponent->used) {
+            cout<<"Duplicate color component\n";
+            header->valid = false;
+            return;
+        }
+        colorComponent->used = true;
+
+        bytebits huffmanTableIDs = f.get();
+        colorComponent->huffmanACTableID  = huffmanTableIDs & 0x0F;
+        colorComponent->huffmanDCTableID = huffmanTableIDs >> 4;
+
+        if (colorComponent->huffmanACTableID > 3) {
+            cout<<"Huffman AC Table id invalid\n";
+            header->valid = false;
+            return;
+        }
+
+        if (colorComponent->huffmanDCTableID > 3) {
+            cout<<"Huffman DC Table id invalid\n";
+            header->valid = false;
+            return;
+        }
+
+    }
+
+    header->startOfSelection = f.get();
+    header->endOfSelection = f.get();
+    bytebits successiveAprrox = f.get();
+    header->succesiveAppoximationHigh= successiveAprrox >> 4;
+    header->succesiveAppoximationHigh= successiveAprrox & 0x0F;
+
+    // Baseline JPEG does not use spectral selection or successive approximation
+    if(header->startOfSelection != 0 && header->endOfSelection!=63) {
+        cout<<"Invalid spectral selection\n";
+        header->valid = false;
+        return;
+    }
+
+    if(header->succesiveAppoximationHigh != 0 && header->succesiveAppoximationLow!=0) {
+        cout<<"Invalid succesive appoximation\n";
+        header->valid = false;
+        return;
+    }
+    
+    if(length - 2 - 1 - numberOfComponents*2 - 3) {
+        cout<<"Erro SOS length\n";
+        header->valid = false;
+        return;
+    }
+}
+
+
+// Used to syncronize with stream
 void readRestartInterval(ifstream& f, Header* const header) {
     cout<<"Reading Restart Interavl markers\n";
     int length = (f.get()<<8) + f.get();
@@ -205,6 +283,7 @@ void readFrame(ifstream& f, Header* const header) {
 
 void printHeader(const Header* const header) {
     if (header == nullptr) return;
+    cout<<"\n";
     cout<<"DQT============="<<endl;
     for (int i = 0; i < 4; i++) {
         if (header->quantizationTable[i].set) {
@@ -219,6 +298,7 @@ void printHeader(const Header* const header) {
         }
     }
 
+    cout<<"\n";
     cout<<"Frame Type "<<::hex<<(int)header->frameType<<::dec<<endl;
     cout<<"Height "<<header->height<<endl;
     cout<<"Width "<<header->width<<endl;
@@ -233,6 +313,7 @@ void printHeader(const Header* const header) {
         cout<<"Quantization Table ID: "<< (int)header->colorComponents[i].quantizationTableID <<"\n";
         cout<<endl;
     }
+    
 
     cout<<"DHT===============\n";
     cout<<"DC Tables\n";
@@ -322,6 +403,9 @@ Header* readJPG(const string& filename ) {
             cout<<"Progressive DCT\n";
             header->frameType = SOF2;
             readFrame(inFile, header);
+        }
+        else if(right == SOS) {
+            readStartOfScan(inFile, header);
         }
         else if(right == DHT) {
             readHuffmanTable(inFile, header);
