@@ -162,11 +162,11 @@ void readHuffmanTable(ifstream& f, Header* const header) {
         HuffmanTable* hTable; 
         if(acTable) {
             cout<<"AC Table\n";
-            hTable = &header->huffmanACTables[tableInfo];
+            hTable = &header->huffmanACTables[tableID];
         }
         else {
             cout<<"DC Table\n";
-            hTable = &header->huffmanDCTables[tableInfo];
+            hTable = &header->huffmanDCTables[tableID];
         }
 
         if(hTable->set) {
@@ -295,6 +295,7 @@ void printHeader(const Header* const header) {
     cout<<"DQT============="<<endl;
     for (int i = 0; i < 4; i++) {
         if (header->quantizationTable[i].set) {
+            cout<<"\n";
             cout<<"Table ID "<< i <<endl;
             cout<<"Table Data"<<endl;
 
@@ -323,12 +324,13 @@ void printHeader(const Header* const header) {
     }
     
 
-    cout<<"DHT===============\n";
+    cout<<"DHT===============\n\n";
+
     cout<<"DC Tables\n";
     for (int i = 0; i < 4; i++){
         HuffmanTable dc = header->huffmanDCTables[i];
         if (dc.set) {
-            cout<<"Table ID "<<i<<endl;
+            cout<<"\nTable ID "<<i<<endl;
             for (int j = 0; j < 16; j++) {
                 cout<<"Code length "<<j<<": ";
                 for (int symbolIndex = dc.offset[j]; 
@@ -342,15 +344,17 @@ void printHeader(const Header* const header) {
     }
 
 
-    cout<<"AC Tables\n";
+    cout<<"\nAC Tables\n";
     for (int i = 0; i < 4; i++){
         HuffmanTable ac = header->huffmanACTables[i];
         if (ac.set) {
-            cout<<"Table ID "<<i<<endl;
+            cout<<"\nTable ID "<<i<<endl;
             for (int j = 0; j < 16; j++){
-                cout<<"Code length "<<j<<"\n";
-                for (int symbolIndex = ac.offset[j]; symbolIndex < ac.offset[j+1]; symbolIndex++){
-                    cout<<::hex<<ac.symbols[symbolIndex]<<::dec<<" ";
+                cout<<"Code length "<<j<<": ";
+                for (int symbolIndex = ac.offset[j]; 
+                    symbolIndex < ac.offset[j+1]; 
+                    symbolIndex++) {
+                    cout<<::hex<<(uint)ac.symbols[symbolIndex]<<::dec<<" ";
                 }
                 cout<<"\n";
             }
@@ -358,8 +362,20 @@ void printHeader(const Header* const header) {
     }
 
 
-    cout<<"DRI===============\n";
-    cout<<header->restartInterval<<"\n";
+    cout << "SOS=============\n";
+    cout << "Start of Selection: " << (uint)header->startOfSelection << '\n';
+    cout << "End of Selection: " << (uint)header->endOfSelection << '\n';
+    cout << "Successive Approximation High: " << (uint)header->succesiveAppoximationHigh << '\n';
+    cout << "Successive Approximation Low: " << (uint)header->succesiveAppoximationLow << '\n';
+    cout << "Color Components:\n";
+    for (uint i = 0; i < header->numOfComponents; ++i) {
+        cout << "Component ID: " << (i + 1) << '\n';
+        cout << "Huffman DC Table ID: " << (uint)header->colorComponents[i].huffmanDCTableID << '\n';
+        cout << "Huffman AC Table ID: " << (uint)header->colorComponents[i].huffmanACTableID << '\n';
+    }
+    cout << "Length of Huffman Data: " << header->huffmanData.size() << '\n';
+    cout << "DRI=============\n";
+    cout << "Restart Interval: " << header->restartInterval << '\n';
 }
 
 Header* readJPG(const string& filename ) {
@@ -387,10 +403,7 @@ Header* readJPG(const string& filename ) {
     left = (bytebits)inFile.get();
     right = (bytebits)inFile.get();
 
-
-
     while(header->valid) {
-
         if(!inFile) {
             cout<<"Error in file"<<endl;
             header->valid = false;
@@ -423,6 +436,7 @@ Header* readJPG(const string& filename ) {
         }
         else if(right == SOS) {
             readStartOfScan(inFile, header);
+            break;
         }
         else if(right == DHT) {
             readHuffmanTable(inFile, header);
@@ -486,6 +500,86 @@ Header* readJPG(const string& filename ) {
         left = (bytebits)inFile.get();
         right = (bytebits)inFile.get();
     }
+
+    if (header->valid) {
+        right = inFile.get();
+        // read compressed image data
+        while (true) {
+            if (!inFile) {
+                std::cout << "Error - File ended prematurely\n";
+                header->valid = false;
+                inFile.close();
+                return header;
+            }
+
+            left = right;
+            right = inFile.get();
+            // if marker is found
+            if (left == 0xFF) {
+                // end of image
+                if (right == EOI) {
+                    break;
+                }
+                // 0xFF00 means put a literal 0xFF in image data and ignore 0x00
+                else if (right == 0x00) {
+                    header->huffmanData.push_back(right);
+                    // overwrite 0x00 with next byte
+                    right = inFile.get();
+                }
+                // restart marker
+                else if (right >= RST0 && right <= RST7) {
+                    // overwrite marker with next byte
+                    right = inFile.get();
+                }
+                // ignore multiple 0xFF's in a row
+                else if (right == 0xFF) {
+                    // do nothing
+                    continue;
+                }
+                else {
+                    cout << "Error - Invalid marker during compressed data scan: 0x" << ::hex << (uint)right << ::dec << '\n';
+                    header->valid = false;
+                    inFile.close();
+                    return header;
+                }
+            }
+            else {
+                header->huffmanData.push_back(right);
+            }
+        }
+    }
+
+      // validate header info
+    if (header->numOfComponents != 1 && header->numOfComponents != 3) {
+        std::cout << "Error - " << (uint)header->numOfComponents << " color components given (1 or 3 required)\n";
+        header->valid = false;
+        inFile.close();
+        return header;
+    }
+
+    for (uint i = 0; i < header->numOfComponents; ++i) {
+        if (header->quantizationTable[header->colorComponents[i].quantizationTableID].set == false) {
+            std::cout << "Error - Color component using uninitialized quantization table\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        if (header->huffmanDCTables[header->colorComponents[i].huffmanDCTableID].set == false) {
+            std::cout << "Error - Color component using uninitialized Huffman DC table\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        if (header->huffmanACTables[header->colorComponents[i].huffmanACTableID].set == false) {
+            std::cout << "Error - Color component using uninitialized Huffman AC table\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+    }
+
+    inFile.close();
+    
     return header;
 }
 

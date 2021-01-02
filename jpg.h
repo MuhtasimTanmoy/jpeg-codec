@@ -43,7 +43,7 @@ struct Header {
     bytebits succesiveAppoximationHigh = 0;
     bytebits succesiveAppoximationLow = 0;
 
-    vector<bytebits> huffmanData;
+    std::vector<bytebits> huffmanData;
 };
 
 const bytebits zigzagMap[] = {
