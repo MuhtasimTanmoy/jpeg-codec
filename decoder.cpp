@@ -12,6 +12,14 @@ void readAPPN(ifstream& fs, Header* const header) {
     }
 }
 
+void readComment(ifstream& fs, Header* const header) {
+    cout<<"Reading Comment"<<endl;
+    uint length = (fs.get() << 8) + fs.get();
+    for (uint i = 0; i < length-2; i++) {
+        fs.get();
+    }
+}
+
 void readDQT(ifstream& fs, Header* const header) {
     cout<<"Quantization table"<<endl;
     int length = (fs.get() << 8) + fs.get();
@@ -378,19 +386,25 @@ Header* readJPG(const string& filename ) {
     }
     left = (bytebits)inFile.get();
     right = (bytebits)inFile.get();
-    while(header->valid){
-        if(!inFile){
+
+
+
+    while(header->valid) {
+
+        if(!inFile) {
             cout<<"Error in file"<<endl;
             header->valid = false;
             inFile.close();
             return header;
         }
+
         if(left != 0xFF) {
             cout<<"Not a marker"<<endl;
             header->valid = false;
             inFile.close();
             return header;
         }
+
         if (right == DQT) {
             readDQT(inFile, header);
         }
@@ -404,6 +418,9 @@ Header* readJPG(const string& filename ) {
             header->frameType = SOF2;
             readFrame(inFile, header);
         }
+        else if(right == COM) {
+            readComment(inFile, header);
+        }
         else if(right == SOS) {
             readStartOfScan(inFile, header);
         }
@@ -416,6 +433,56 @@ Header* readJPG(const string& filename ) {
         else if(right == DRI) {
             readRestartInterval(inFile, header);
         }
+        else if((right >= JPEG0 && right<=JPEG13) ||
+                right == DNL || 
+                right == DHP ||
+                right == EXP) {
+            readComment(inFile, header);
+        }
+        else if (right == TEM) {
+            // TEM has no size
+        }
+        else if (right == 0xFF) {
+            right = inFile.get();
+            continue;
+        }
+        else if (right == SOI) {
+            cout<<"Error: Start of image marker should not be encountered\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        else if (right == EOI) {
+            cout<<"Error: EOI should be only encountered in SOS\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        else if (right == DAC) {
+            cout<<"Error: Arithmatic coding not supported\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        else if (right >= SOF0 || right <=SOF15) {
+            cout<<"Error: Wrong SOF\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        else if (right >= RST0 || right <= RST5) {
+            cout<<"Error: Restart markers should not be seen outside SOS \n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+        else {
+            cout<<"Unknown marker\n";
+            header->valid = false;
+            inFile.close();
+            return header;
+        }
+
         left = (bytebits)inFile.get();
         right = (bytebits)inFile.get();
     }

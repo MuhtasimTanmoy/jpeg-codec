@@ -58,6 +58,19 @@ const bytebits EOI = (bytebits)0xd9;
 /// Define Number of Lines
 const bytebits DNL = (bytebits)0xdc;
 
+/// Define Heirchical Progression
+const bytebits DHP = (bytebits)0xde;
+
+/// Expand reference components
+const bytebits EXP = (bytebits)0xdf;
+
+/// No length
+const bytebits TEM = (bytebits)0x01;
+
+/// No length
+const bytebits DAC = (bytebits)0xCC;
+
+
 
 // JFIF identifiers
 const bytebits JFIF_J = (bytebits)0x4a;
@@ -91,5 +104,21 @@ const bytebits RST4 = (bytebits)0xd4;
 const bytebits RST5 = (bytebits)0xd5;
 const bytebits RST6 = (bytebits)0xd6;
 const bytebits RST7 = (bytebits)0xd7;
+
+
+const bytebits JPEG0 = (bytebits)0xF0;
+const bytebits JPEG1 = (bytebits)0xF1;
+const bytebits JPEG2 = (bytebits)0xF2;
+const bytebits JPEG3 = (bytebits)0xF3;
+const bytebits JPEG4 = (bytebits)0xF4;
+const bytebits JPEG5 = (bytebits)0xF5;
+const bytebits JPEG6 = (bytebits)0xF6;
+const bytebits JPEG7 = (bytebits)0xF7;
+const bytebits JPEG8 = (bytebits)0xF8;
+const bytebits JPEG9 = (bytebits)0xF9;
+const bytebits JPEG10 = (bytebits)0xFa;
+const bytebits JPEG11 = (bytebits)0xFb;
+const bytebits JPEG12 = (bytebits)0xFc;
+const bytebits JPEG13 = (bytebits)0xFd;
 
 #endif
