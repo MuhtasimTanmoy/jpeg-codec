@@ -7,6 +7,8 @@
         "ostream": "cpp",
         "random": "cpp",
         "cstddef": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "__tree": "cpp",
+        "set": "cpp"
     }
 }

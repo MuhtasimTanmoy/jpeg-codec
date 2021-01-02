@@ -16,9 +16,18 @@ struct ColorComponent
     bool used = false;
 };
 
+struct HuffmanTable 
+{
+    bytebits symbols[162] = { 0 };
+    bytebits offset[17] = { 0 };
+    bool set = false; 
+};
+
 struct Header
 {
     QuantizationTable quantizationTable[4];
+    HuffmanTable huffmanDCTables[4];
+    HuffmanTable huffmanACTables[4];
 
     uint height = 0;
     uint width = 0;
@@ -42,5 +51,6 @@ const bytebits zigzagMap[] = {
     21, 34, 37, 47, 50, 56, 59, 61,
     35, 36, 48, 49, 57, 58, 62, 63
 };
+
 
 #endif

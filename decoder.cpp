@@ -56,6 +56,66 @@ void readRestartInterval(ifstream& f, Header* const header) {
     }
 }
 
+void readHuffmanTable(ifstream& f, Header* const header) {
+    cout<<"Reading Huffman table\n";
+    int length = (f.get() << 8) + f.get();
+    length-=2;
+
+    while (length > 0)
+    {
+        bytebits tableInfo = f.get();
+        bool acTable = tableInfo >> 4;
+        uint tableID = tableInfo & 0x0F;
+
+        if(tableID > 3) {
+            cout<<"Invalid huffman table\n";
+            header->valid = false;
+            return;
+        }
+
+        HuffmanTable* hTable; 
+        if(acTable) {
+            cout<<"AC Table\n";
+            hTable = &header->huffmanACTables[tableInfo];
+        }
+        else {
+            cout<<"DC Table\n";
+            hTable = &header->huffmanDCTables[tableInfo];
+        }
+
+        if(hTable->set) {
+            cout<<"Duplicate huffman table encounter\n";
+            header->valid = false;
+            return;
+        } 
+        hTable->set = true; 
+
+        hTable->offset[0] = 0;
+        uint allSymbols = 0;
+        for (int i = 1; i <= 16; i++) {
+            allSymbols += f.get();
+            hTable->offset[i] = allSymbols;
+        }
+
+        if(allSymbols > 162) {
+            cout<<"Symbols count error\n";
+            header->valid = false;
+            return;
+        }
+
+        for (int i = 0; i < allSymbols; i++) {
+            hTable->symbols[i] = f.get(); 
+        }
+        length = length - 1 - 16 - allSymbols;
+    }
+
+    if (length != 0) {
+        cout<<"Huffman table length error\n";
+        header->valid = false;
+        return;
+    }
+}
+
 void readFrame(ifstream& f, Header* const header) {
     cout<<"Reading SOF markers\n";
     if(header->numOfComponents != 0) {
@@ -135,7 +195,7 @@ void readFrame(ifstream& f, Header* const header) {
             return;
         }
 
-        if (length -2 - 1 - 4 - 1 - header->numOfComponents * 3 != 0) {
+        if (length - 2 - 1 - 4 - 1 - header->numOfComponents * 3 != 0) {
             cout<<"Invalid length\n";
             header->valid = false;
             return;
@@ -145,7 +205,7 @@ void readFrame(ifstream& f, Header* const header) {
 
 void printHeader(const Header* const header) {
     if (header == nullptr) return;
-    cout<<"DQT"<<endl;
+    cout<<"DQT============="<<endl;
     for (int i = 0; i < 4; i++) {
         if (header->quantizationTable[i].set) {
             cout<<"Table ID "<< i <<endl;
@@ -165,7 +225,6 @@ void printHeader(const Header* const header) {
     cout<<"Number of Components "<<header->numOfComponents<<endl;
 
     cout<<"Components "<<endl;
-
     for (int i = 0; i < header->numOfComponents; i++) {
         cout<<endl;
         cout<<"Component ID "<<i<<" "<<"\n";
@@ -174,6 +233,44 @@ void printHeader(const Header* const header) {
         cout<<"Quantization Table ID: "<< (int)header->colorComponents[i].quantizationTableID <<"\n";
         cout<<endl;
     }
+
+    cout<<"DHT===============\n";
+    cout<<"DC Tables\n";
+    for (int i = 0; i < 4; i++){
+        HuffmanTable dc = header->huffmanDCTables[i];
+        if (dc.set) {
+            cout<<"Table ID "<<i<<endl;
+            for (int j = 0; j < 16; j++) {
+                cout<<"Code length "<<j<<": ";
+                for (int symbolIndex = dc.offset[j]; 
+                    symbolIndex < dc.offset[j+1]; 
+                    symbolIndex++) {
+                    cout<<::hex<<(uint)dc.symbols[symbolIndex]<<::dec<<" ";
+                }
+                cout<<"\n";
+            }
+        }
+    }
+
+
+    cout<<"AC Tables\n";
+    for (int i = 0; i < 4; i++){
+        HuffmanTable ac = header->huffmanACTables[i];
+        if (ac.set) {
+            cout<<"Table ID "<<i<<endl;
+            for (int j = 0; j < 16; j++){
+                cout<<"Code length "<<j<<"\n";
+                for (int symbolIndex = ac.offset[j]; symbolIndex < ac.offset[j+1]; symbolIndex++){
+                    cout<<::hex<<ac.symbols[symbolIndex]<<::dec<<" ";
+                }
+                cout<<"\n";
+            }
+        }
+    }
+
+
+    cout<<"DRI===============\n";
+    cout<<header->restartInterval<<"\n";
 }
 
 Header* readJPG(const string& filename ) {
@@ -221,10 +318,13 @@ Header* readJPG(const string& filename ) {
             header->frameType = SOF0;
             readFrame(inFile, header);
         }
-        else if (right == SOF2) {
+        else if (right == SOF2) { 
             cout<<"Progressive DCT\n";
             header->frameType = SOF2;
             readFrame(inFile, header);
+        }
+        else if(right == DHT) {
+            readHuffmanTable(inFile, header);
         }
         else if (right >= APP0 && right <= APP15) {
             readAPPN(inFile, header);
